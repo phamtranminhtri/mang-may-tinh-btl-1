@@ -1,0 +1,86 @@
+\section{Hybrid chat application}
+
+
+Thiết kế này áp dụng nguyên tắc phân tách trách nhiệm (Separation of Concerns) rõ ràng giữa hai thành phần chính:
+\begin{itemize}
+    \item Web Server (start\_app.py): Đóng vai trò là "người điều phối". Server chịu trách nhiệm quản lý việc xác thực (authentication) người dùng, phân quyền (authorization), tạo channel, quản lý thành viên (ai được tham gia) và lưu trữ mật khẩu (dưới dạng hash).
+    \item P2P Client (start\_p2p.py): Chịu trách nhiệm xử lý toàn bộ logic nhắn tin (messaging). Sau khi được Web Server "giới thiệu" và cung cấp danh sách thành viên, P2P Client sẽ thực hiện broadcast tin nhắn trực tiếp đến các thành viên khác trong channel mà không cần thông qua server.
+\end{itemize}
+
+
+
+\subsection{Chatting between 2 peer}
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Channel management}
+
+
+Tính năng Channel Chat được thiết kế để cho phép nhiều người dùng tham gia vào một phòng chat chung , song song với tính năng chat 1-1 hiện có. Mỗi channel được xác định duy nhất bằng tên (channel name) và được bảo vệ bằng mật khẩu để kiểm soát truy cập.
+
+
+
+
+
+
+ Luồng hoạt động chi tiết như sau:
+
+\begin{itemize}
+    \item 
+
+    \item Tạo Channel mới - \textbf{@app.route("/create-channel", methods=["POST"])}: Người dùng khởi tạo một phòng chat mới.
+    \begin{enumerate}
+        \item  Đầu tiên, User cung cấp channel\_name và password qua form.
+        \item Tiếp theo Server kiểm tra channel\_name có tồn tại trong hệ thống chưa. Nếu đã tồn tại thì báo lỗi cho người dùng.
+        \item Nếu chưa thì tuần tự Server thực hiện hash(password) để lưu trữ an toàn, sau đó tạo một mục mới trong cấu trúc dữ liệu channels và cuối cùng thêm địa chỉ của người dùng vào danh sách thành viên đầu tiên.
+    \end{enumerate}
+
+
+   \item Xem danh sách và Tham gia Channel - \textbf{@app.route("/channel", methods=["GET"])} và \textbf{@app.route("/join-channel", methods=["POST"])}: Cho phép người dùng thấy các channel có sẵn và tham gia chúng. Với xem luồng danh sách thì khi truy cập channel, server hiển thị 2 danh sách bao gồm joined channels - Các channel mà người dùng đã là thành viên; và available channels - Các channel khác mà người dùng có thể tham gia. Còn đối với luồng tham gia:
+   \begin{enumerate}
+       \item User chọn một channel từ "Available channels" và nhập password.
+       \item Server lấy password người dùng nhập, thực hiện hash và so sánh với stored\_password\_hash của channel đó.
+       \item Nếu hash(password) == stored\_password\_hash, thêm địa chỉ của user (user\_address) vào address\_list của channel kèm thông báo tham gia thành công. Nếu sai, báo lỗi mật khẩu không chính xác.
+   \end{enumerate}
+
+
+
+   \item Kết nối vào Channel Chat (Handoff to P2P) - \textbf{@app.route("/connect-channel", methods=["POST"])}: Khởi tạo phiên chat P2P sau khi người dùng đã được xác thực là thành viên.
+   \begin{enumerate}
+       \item User nhấp vào "Connect" trên một channel đã tham gia.
+       \item Web Server lấy address\_list (danh sách địa chỉ IP/Port) của tất cả thành viên hiện tại trong channel đó.
+       \item Server thực hiện một POST redirect (chuyển hướng POST) sang ứng dụng P2P Client (start\_p2p.py), mang theo address\_list này.
+       \item P2P Client nhận được danh sách, lưu vào channel\_members[channel\_name] và thực hiện broadcast một thông báo "join" đến tất cả các thành viên trong danh sách.
+   \end{enumerate}
+
+
+
+   \item Chat trong Channel: Luồng gửi và nhận tin nhắn P2P. Đây là luồng gửi tin nhắn:
+   \begin{enumerate}
+       \item  User gõ tin nhắn trong giao diện (UI) của channel.
+       \item P2P App (của người gửi) xác định channel hiện tại (channel\_name).
+       \item App lấy danh sách thành viên từ channel\_members[channel\_name].
+       \item App thực hiện broadcast (gửi đồng thời) tin nhắn đến tất cả địa chỉ trong danh sách đó.
+   \end{enumerate}
+   Còn đây là luồng nhận tin nhắn:
+   \begin{enumerate}
+       \item P2P Client (của người nhận) lắng nghe và nhận được một tin nhắn.
+       \item Client kiểm tra định dạng tin nhắn.
+       \item Client phân tích (parse) tin nhắn để lấy sender\_address, timestamp, channel\_name, và message.
+       \item Client xác định đây là tin nhắn của channel\_name và hiển thị nội dung message lên UI của channel tương ứng.
+   \end{enumerate}
+\end{itemize}
+
+
+
+Để cụ thể hơn về định dạng tin nhắn được nhắc ở trên thì cần phân tích sâu hơn ở đặc điểm chính là để phân biệt tin nhắn. Để phân biệt tin nhắn 1-1 và tin nhắn channel, một định dạng prefix đặc biệt được sử dụng ở trong này. Client P2P sẽ dựa vào prefix này để xử lý tin nhắn đúng cách.
+
+Định dạng này được định nghĩa như sau: [sender\_address] [timestamp] [Channel]: channel\_name  message. Tiền tố [Channel]channel\_name là dấu hiệu nhận biết (flag) cho P2P Client rằng đây là tin nhắn thuộc về một channel cụ thể.

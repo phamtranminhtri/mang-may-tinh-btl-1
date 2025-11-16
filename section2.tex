@@ -1,0 +1,62 @@
+\section{HTTP server with cookie session}
+\subsection{Implement authentication handling}
+Hệ thống WeApRous thực hiện việc xác thực thông qua sự phối hợp của 4 tệp: start\_app.py (định nghĩa logic), httpadapter.py (điều phối), request.py (xử lý body), và response.py (tạo phản hồi).
+\subsubsection{Routing \& Validation}
+\begin{itemize}
+    \item Tệp \texttt{start\_app.py} định nghĩa route: \texttt{@app.route('/login', methods=['POST'])} và liên kết nó với hàm \texttt{login\_post}.
+    \item \texttt{request.py} (trong \texttt{prepare\_body}) phân tích cú pháp \texttt{body} của yêu cầu POST (đã được \texttt{httpadapter.py} truyền vào) để lấy \texttt{username} và \texttt{password}.
+    \item Hàm \texttt{login\_post} thực hiện kiểm tra logic: \texttt{if (username == "admin" and password == "password") ...}. Điều này đáp ứng yêu cầu xác thực.
+\end{itemize}
+\subsubsection{Invalid}
+\begin{itemize}
+    \item Nếu \texttt{if} thất bại, hàm \texttt{login\_post} trả về một từ điển: \texttt{\{"auth": "false"\}}.
+        \item \texttt{httpadapter.py} (trong \texttt{handle\_client}) nhận kết quả này (\texttt{hook\_result}). Nó kiểm tra \texttt{if hook\_result["auth"] == "false":}.
+        \item Nó ngay lập tức gọi \texttt{response = resp.build\_unauthorized()}.
+        \item Hàm \texttt{build\_unauthorized} trong \texttt{response.py} tạo ra một trang phản hồi \texttt{HTTP/1.1 401 Unauthorized} hoàn chỉnh.
+        \item \textbf{Kết luận:} Yêu cầu "401 Unauthorized" được đáp ứng chính xác.
+\end{itemize}
+\subsubsection{Valid}
+\begin{itemize}
+    \item Nếu \texttt{if} thành công, hàm \texttt{login\_post} tạo một \texttt{session\_id} và trả về một từ điển phức tạp hơn: \texttt{\{"auth": "true", "redirect": "/", "session\_id": session\_id\}}.
+        \item \texttt{httpadapter.py} nhận kết quả này. Nó \textbf{không} trả về trang \texttt{index} ngay lập tức. Thay vào đó, nó phát hiện khóa \texttt{"redirect"}.
+        \item Nó gọi hàm \texttt{response = resp.build\_redirect(redirect, req, new\_session\_id)}.
+        \item Hàm \texttt{build\_redirect} trong \texttt{response.py} tạo ra một phản hồi \texttt{HTTP/1.1 302 Found} (chuyển hướng).
+        \item \textbf{Thiết lập Cookie:} Quan trọng nhất, bên trong \texttt{build\_redirect}, nó chèn các header \texttt{Set-Cookie} vào phản hồi:
+        \begin{itemize}
+            \item Set-Cookie: auth=true; Path=/
+            \item Set-Cookie: session\_id=...; Path=/
+        \end{itemize}
+        \item \textbf{Kết luận:} Yêu cầu được đáp ứng. Máy chủ đặt cookie \texttt{auth=true} thành công. Thay vì trực tiếp phục vụ trang \texttt{index}, nó sử dụng một thông báo chuyển hướng (Redirect), điều này khiến trình duyệt của máy khách tự động thực hiện một yêu cầu \texttt{GET /} mới, và yêu cầu này sẽ được xử lý bởi logic của Task 1B.
+\end{itemize}
+\subsection{Implement cookie-based access control}
+\subsubsection{Routing}
+ Tệp \texttt{start\_app.py} định nghĩa route: \texttt{@app.route('/', methods=['GET'])} và liên kết nó với hàm \texttt{index}.
+\subsubsection{Cookie Check}
+\begin{itemize}
+    \item Hành động đầu tiên của hàm \texttt{index} là gọi \texttt{if not authenticate(headers): return \{"auth": "false"\}}. Hàm \texttt{authenticate} (trong \texttt{start\_app.py}) là cơ chế kiểm soát truy cập.
+    \item \textbf{Phân tích \texttt{authenticate(headers)}:}
+    \begin{itemize}
+        \item Nó không đọc trực tiếp header \texttt{Cookie:} Thay vào đó, nó dựa vào \texttt{request.py}.
+        \item Khi yêu cầu \texttt{GET /} đến, \texttt{request.prepare} được gọi trước. \texttt{request.prepare} gọi \texttt{prepare\_cookies}.
+        \item \texttt{prepare\_cookies} đọc chuỗi cookie thô (ví dụ: \texttt{"auth=true; session\_id=123"}) và phân tích nó thành một từ điển Python: \texttt{\{'auth': 'true', 'session\_id': '123'\}}. Từ điển này được lưu trong \texttt{headers["cookie-pair"]}.
+        \item Hàm \texttt{authenticate} sau đó đọc từ điển đã được xử lý này: \texttt{cookie = headers.get("cookie-pair", None)}.
+        \item Nó kiểm tra cụ thể: \texttt{auth = cookie.get("auth", "")} và sau đó kiểm tra \texttt{if auth == "true" and session_id in session_to_account}.
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Invalid cookie}
+    \begin{itemize}
+        \item Nếu \texttt{authenticate} trả về \texttt{False} (do \texttt{cookie} không tồn tại, \texttt{auth} không phải là \texttt{"true"}, hoặc \texttt{session\_id} không hợp lệ), hàm \texttt{index} sẽ trả về \texttt{\{"auth": "false"\}}.
+        \item \texttt{httpadapter.py} bắt được giá trị này và nó gọi \texttt{resp.build\_unauthorized()} để trả về \texttt{401 Unauthorized}.
+        \item \textbf{Kết luận:} Yêu cầu được đáp ứng chính xác.
+    \end{itemize}
+
+\subsubsection{Valid cookie}
+    \begin{itemize}
+        \item Nếu \texttt{authenticate} trả về \texttt{True}, hàm \texttt{index} tiếp tục thực thi.
+        \item Nó trả về một từ điển: \texttt{\{"auth": "true", "content": "index.html", "placeholder": ...\}}.
+        \item \texttt{httpadapter.py} nhận kết quả này. Nó thấy khóa \texttt{"content"} (và \texttt{"placeholder"}).
+        \item Nó gọi \texttt{response = resp.build\_content\_placeholder(req, content, placeholder)}.
+        \item Hàm này trong \texttt{response.py} sẽ tải tệp \texttt{index.html} từ thư mục \texttt{www/}, thay thế bất kỳ nội dung động nào (nếu có), và xây dựng một phản hồi \texttt{HTTP/1.1 200 OK} hoàn chỉnh với nội dung trang.
+        \item \textbf{Kết luận:} Yêu cầu "phục vụ trang index" được đáp ứng.
+    \end{itemize}
