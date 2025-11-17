@@ -1,1 +1,11 @@
 \section{Kết luận}
+
+Bài tập lớn 1, ``Implement HTTP server and chat application'', đã được nhóm 8386 hoàn thành với các chức năng cốt lõi bám sát yêu cầu đề bài. 
+Nhóm đã thành công trong việc xây dựng một hệ thống hoàn chỉnh từ đầu, không sử dụng các framework web có sẵn, mà chỉ dùng các thư viện cơ bản của Python như \texttt{socket} và \texttt{threading}.
+
+BTL đã áp dụng và làm rõ các khái niệm mạng máy tính trọng tâm. 
+Mô hình client-server được sử dụng hiệu quả cho HTTP server, xử lý xác thực và quản lý phiên người dùng qua cookie. 
+Mô hình peer-to-peer (P2P) được triển khai thành công cho ứng dụng chat; trong đó, server trung tâm đóng vai trò tracker để quản lý danh sách peer, còn việc nhắn tin 1-1 và chat nhóm diễn ra trực tiếp giữa các peer.
+
+Nhóm đã thành công trong việc thiết kế và phân định vai trò của các tiến trình (server, client, peer) trong một hệ thống phân tán, cũng như cách thiết kế một giao thức P2P đơn giản qua TCP/IP; quản lý kết nối đa luồng và đồng bộ trạng thái giữa các peer.
+Hệ thống hoàn thành đã đáp ứng được các yêu cầu về chức năng, từ xác thực cho đến chat 1-1 và chat nhóm. 

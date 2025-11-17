@@ -1,2 +1,23 @@
 \section{Mở đầu}
 
+Trong bối cảnh công nghệ thông tin hiện đại, các ứng dụng mạng đóng vai trò then chốt trong hầu hết mọi hoạt động, từ giao tiếp, làm việc đến giải trí. 
+Mục tiêu của bài tập lớn là thiết kế và triển khai một server HTTP và ứng dụng chat Peer-to-Peer. 
+BTL yêu cầu xây dựng hệ thống từ đầu, sử dụng các thư viện lập trình python socket TCP, mà không dựa trên các framework web có sẵn. 
+Hệ thống này kết hợp hai mô hình mạng cơ bản: mô hình Client-Server và mô hình Peer-to-Peer (P2P).
+
+Nội dung chính của BTL gồm:
+
+\begin{enumerate}
+    \item \textbf{HTTP Server với Cookie Session:}  
+    Xây dựng một máy chủ HTTP có khả năng xử lý các yêu cầu, parse header, và quản lý nội dung static.  
+    Một yêu cầu quan trọng là triển khai cơ chế xác thực người dùng (authentication) và quản lý phiên (session) dựa trên cookie.
+
+    \item \textbf{Ứng dụng Chat Hybrid:}  
+    Phát triển một ứng dụng chat kết hợp cả hai mô hình.  
+    Mô hình client-server được sử dụng cho các tác vụ ban đầu như đăng ký, đăng nhập và đăng ký địa chỉ peer (peer registration).  
+    Sau đó, hệ thống chuyển sang mô hình P2P cho việc trò chuyện trực tiếp (direct peer communication) và trò chuyện nhóm (channel management).
+\end{enumerate}
+
+Nhóm sẽ trình bày chi tiết về kiến trúc hệ thống, các quyết định thiết kế và triển khai code, từ luồng xử lý của HTTP server, logic quản lý cookie, đến giao thức giao tiếp P2P.
+
+Repo code của BTL: \url{https://github.com/phamtranminhtri/8386-CO3094-weaprous}
