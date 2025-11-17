@@ -40,7 +40,7 @@ Hệ thống WeApRous thực hiện việc xác thực thông qua sự phối h�
         \item Khi yêu cầu \texttt{GET /} đến, \texttt{request.prepare} được gọi trước. \texttt{request.prepare} gọi \texttt{prepare\_cookies}.
         \item \texttt{prepare\_cookies} đọc chuỗi cookie thô (ví dụ: \texttt{"auth=true; session\_id=123"}) và phân tích nó thành một từ điển Python: \texttt{\{'auth': 'true', 'session\_id': '123'\}}. Từ điển này được lưu trong \texttt{headers["cookie-pair"]}.
         \item Hàm \texttt{authenticate} sau đó đọc từ điển đã được xử lý này: \texttt{cookie = headers.get("cookie-pair", None)}.
-        \item Nó kiểm tra cụ thể: \texttt{auth = cookie.get("auth", "")} và sau đó kiểm tra \texttt{if auth == "true" and session_id in session_to_account}.
+        \item Nó kiểm tra cụ thể: \texttt{auth = cookie.get("auth", "")} và sau đó kiểm tra \texttt{if auth == "true" and session\_id in session\_to\_account}.
     \end{itemize}
 \end{itemize}
 
