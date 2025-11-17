@@ -11,6 +11,98 @@ Thiết kế này áp dụng nguyên tắc phân tách trách nhiệm (Separatio
 
 \subsection{Chatting between 2 peer}
 
+% \subsection{Peer-to-Peer Paradigm}
+Hệ thống hỗ trợ hai chức năng chính trong mô hình P2P:
+\begin{itemize}
+    \item Giao tiếp trực tiếp 1--1 giữa các peer.
+    \item Broadcast tin nhắn đến tất cả peer trong mạng.
+\end{itemize}
+Luồng hoạt động chính: 
+\begin{itemize}
+
+    \item Gửi thông tin địa chỉ — \textbf{@app.route('/submit-info', methods=['POST'])}:  
+    Người dùng gửi thông tin địa chỉ \textit{(chatting IP, port, local-port)} trước khi tham gia mạng P2P.
+    \begin{enumerate}
+        \item Người dùng nhập thông tin địa chỉ thông qua form trên giao diện.
+        \item Hệ thống kiểm tra tính hợp lệ của địa chỉ và thực hiện xác thực người dùng.
+        \item Sau khi xác thực thành công, hệ thống lấy \textit{username} và lưu thông tin địa chỉ tương ứng vào bảng \texttt{account\_to\_address}.
+    \end{enumerate}
+
+    \item Xem danh sách các người dùng — \textbf{@app.route('/get-list', methods=['GET'])}:  
+    Hỗ trợ người dùng xem danh sách peer đang online trong mạng P2P.
+    \begin{enumerate}
+        \item Hệ thống xác thực người dùng và kiểm tra xem người dùng đã khai báo địa chỉ hay chưa.
+        \item Duyệt toàn bộ bảng \texttt{account\_to\_address} để xây dựng danh sách peer đang hoạt động.
+        \item Với mỗi peer, hệ thống sinh một form HTML cho phép kết nối trực tiếp 1–1 thông qua endpoint \texttt{/connect-peer}.
+        \item Đồng thời tạo form broadcast, chứa danh sách toàn bộ peer còn lại để gửi tin nhắn diện rộng.
+    \end{enumerate}
+
+\end{itemize}
+
+\subsubsection{Giao tiếp trực tiếp 1-1 giữa peer}
+
+Chức năng giao tiếp trực tiếp giữa các peer được hiện thực theo cơ chế trao đổi tin nhắn giữa hai peer không phụ thuộc vào bất kỳ máy chủ trung gian nào; thay vào đó, hai ứng dụng liên kết trực tiếp với nhau thông qua kết nối TCP socket.
+
+Luồng hoạt động chi tiết như sau:
+
+\begin{itemize}
+
+    \item Kết nối vào đoạn chat — \textbf{@app.route("/connect-peer", methods=["POST"])}:  
+    Người dùng muốn thiết lập kết nối vào đoạn chat với một người dùng khác.
+    \begin{enumerate}
+        \item Hệ thống lưu thông tin địa chỉ (\textit{server\_ip, server\_port}) của người dùng hiện tại.
+        \item Sau đó, lấy thông tin địa chỉ của peer mà người dùng muốn kết nối.
+        \item Tiếp theo thực hiện chuyển hướng sang trang \texttt{/chat} và kèm theo tham số địa chỉ của peer cần kết nối.
+        \item Tại \textbf{@app.route("/chat", methods=["GET"])}, hệ thống kiểm tra \texttt{chat\_history} để lấy lại nội dung hội thoại đã lưu tương ứng.
+    \end{enumerate}
+
+    \item Gửi tin nhắn — \textbf{@app.route("/chat", methods=["POST"])}:  
+    Người dùng gửi một tin nhắn mới trong giao diện chat.
+    \begin{enumerate}
+        \item Hệ thống lấy địa chỉ peer qua \texttt{headers["query"]} và nội dung tin nhắn từ \texttt{body["message"]}.
+        \item Sau đó đưa tin nhắn này vào \texttt{send\_queue} dưới dạng một tuple \texttt{(peer\_ip, peer\_port, message\_to\_send)}.
+        \item \textit{Sender thread} liên tục đọc tin nhắn từ hàng đợi (\texttt{send\_queue}).
+        \item Sender thread gọi \texttt{send\_message()}, tạo timestamp và đóng gói tin nhắn theo đúng định dạng chuẩn.
+        \item Hàm \texttt{send\_message()} mở một socket TCP tạm thời, kết nối đến địa chỉ của peer đích và chuyển tiếp gói tin.
+        \item Sau khi gửi thành công hoặc xảy ra lỗi, socket được đóng và cập nhật \texttt{chat\_history} cho peer tương ứng.
+    \end{enumerate}
+
+    \item Nhận tin nhắn — mỗi peer duy trì một \textit{server\_thread} thực thi hàm \texttt{start\_server()} mở một socket TCP tại địa chỉ \texttt{0.0.0.0:port} và lắng nghe mọi kết nối đến. Khi có một peer khác gửi tin đến:
+    \begin{enumerate}
+        \item Đầu tiên, server gọi \texttt{accept()} và tạo một handler thread mới để xử lý kết nối đó.
+        \item Tiếp theo đọc thông điệp từ socket, giải mã chuỗi tin nhắn theo đúng định dạng chuẩn và phân tách ba thành phần: sender, timestamp và nội dung.
+        \item Hệ thống hiển thị thông tin tin nhắn lên giao diện console và cập nhật nội dung vào \texttt{chat\_history}.  
+        \item Và khi xử lý xong, kết nối socket được đóng lại.
+    \end{enumerate}
+
+\end{itemize}
+
+\subsubsection{Cơ chế broadcast}
+
+Bên cạnh chức năng giao tiếp 1-1 giữa hai peer, hệ thống còn hỗ trợ cơ chế gửi tin nhắn theo mô hình broadcast, tức là một peer có thể gửi một thông điệp đồng thời đến toàn bộ các peer khác trong mạng. Broadcast là hành động gửi một gói tin duy nhất từ peer nguồn đến tập tất cả các peer được lưu trong danh sách \texttt{peer\_list}.
+
+Luồng hoạt động như sau:
+
+\begin{itemize}
+
+    \item Xác định thông tin địa chỉ — \textbf{@app.route("/broadcast0", methods=["POST"])}:  
+    Người dùng muốn gửi tin nhắn đến mọi người khác:
+    \begin{enumerate}
+        \item Hệ thống lưu thông tin địa chỉ (server\_ip, server\_port) của người dùng hiện tại.
+        \item Sau đó, lấy danh sách thông tin địa chỉ của các peer trong peer-list.
+        \item Tiếp theo hệ thống xác thực người dùng và thực hiện chuyển hướng sang trang \texttt{/broadcast} để hiển thị giao diện tương ứng.
+    \end{enumerate}
+
+    \item Gửi tin nhắn — \textbf{@app.route("/broadcast", methods=["POST"])}:  
+    Người dùng gửi một tin nhắn broadcast từ giao diện:
+    \begin{enumerate}
+        \item Đầu tiên, hệ thống lấy nội dung tin nhắn và tự động thêm tiền tố ``[Broadcast]'' để đánh dấu đây là dạng tin broadcast.
+        \item Hệ thống duyệt qua toàn bộ \texttt{peer\_list}, và với mỗi peer sẽ đưa vào \texttt{send\_queue} một yêu cầu gửi tin: (peer\_ip, peer\_port, broadcast\_message).
+        \item Tiếp theo queue này sẽ được xử lý bởi sender thread.
+    \end{enumerate}
+
+    \item Nhận tin nhắn broadcast: Vì mỗi peer duy trì một \texttt{server\_thread} mở một socket để lắng nghe mọi tin được gửi đến nên phần này hoạt động giống như P2P 1-1.
+\end{itemize}
 
 
 
