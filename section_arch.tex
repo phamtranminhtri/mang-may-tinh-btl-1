@@ -1,0 +1,122 @@
+% %==============================
+% \section{Kiến trúc hệ thống}
+% %==============================
+% Hệ thống WeApRous được thiết kế theo kiến trúc \textbf{hybrid}, gồm hai phần đúng theo hai sơ đồ:
+% (i) \textbf{HTTP Server theo mô hình Reverse Proxy} để phục vụ web và xác thực phiên; và
+% (ii) \textbf{Chat theo mô hình P2P có điều phối bởi Web Server} để các peer nhắn tin trực tiếp.
+
+% %=====================================
+% \subsection{HTTP Server -- Reverse Proxy \& Cookie Session}
+% %=====================================
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=0.85\textwidth]{image/arc_proxy.png}
+%     \caption{Kiến trúc HTTP Server với cơ chế xác thực cookie}
+%     \label{fig:arc_proxy}
+% \end{figure}
+
+% Như Hình~\ref{fig:arc_proxy}, mọi HTTP request từ \textbf{peer (browser)} đều đi vào
+% \textbf{server proxy (\texttt{start\_proxy.py})}. Proxy đóng vai trò \textbf{entry point} của hệ thống,
+% giúp tách biệt lớp tiếp nhận kết nối với lớp xử lý nghiệp vụ. Sau khi nhận request, proxy sẽ
+% \textbf{chuyển tiếp} đến một trong các \textbf{server backend (\texttt{start\_app.py})} đang chạy.
+% Việc có nhiều backend instance cho phép \textbf{mở rộng} và phân tán tải (load distribution) mà không thay đổi phía client.
+
+% Các \textbf{server backend} chịu trách nhiệm xử lý toàn bộ nghiệp vụ HTTP:
+% \begin{itemize}
+%     \item \textbf{Routing}: định tuyến request đến đúng chức năng (trang, API).
+%     \item \textbf{Xác thực và quản lý phiên}: backend tạo/kiểm tra \textbf{cookie session}.
+%     Khi người dùng đăng nhập thành công, backend trả về \texttt{Set-Cookie}; các request sau đó mang \texttt{Cookie}
+%     để backend kiểm tra quyền truy cập.
+%     \item \textbf{Phản hồi nội dung}: trả HTML/JSON và các status code cần thiết (200/302/401,...).
+% \end{itemize}
+
+% Tóm lại, proxy tập trung vào \textbf{chuyển tiếp và điều phối request}, còn backend tập trung vào
+% \textbf{xử lý nghiệp vụ} và \textbf{cookie-based authentication}. Luồng tổng quát là:
+% browser $\rightarrow$ proxy $\rightarrow$ backend $\rightarrow$ proxy $\rightarrow$ browser.
+
+% %==========================================
+% \subsection{Chat P2P -- Server điều phối, Peer truyền dữ liệu}
+% %==========================================
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=0.92\textwidth]{image/arc_p2p.png}
+%     \caption{Kiến trúc ứng dụng Chat P2P}
+%     \label{fig:arc_p2p}
+% \end{figure}
+
+% Như Hình~\ref{fig:arc_p2p}, hệ thống chat được chia thành hai lớp chức năng rõ ràng:
+
+% \begin{itemize}
+%     \item \textbf{Lớp điều phối qua server (control plane):}
+%     mỗi peer dùng \textbf{browser} để làm việc với \textbf{server} (gồm \texttt{start\_app.py} và \texttt{start\_proxy.py})
+%     nhằm đăng nhập/xác thực, khai báo thông tin peer (IP/port), lấy danh sách peer online và thao tác quản lý channel.
+%     Trong lớp này, server đóng vai trò \textbf{tracker/registry} cung cấp thông tin kết nối cần thiết.
+%     \item \textbf{Lớp truyền tin qua P2P (data plane):}
+%     trên mỗi máy người dùng chạy thêm \textbf{P2P client} (\texttt{start\_p2p.py}).
+%     Sau khi đã có thông tin peer từ server, \textbf{peer 1 (start\_p2p.py)} và \textbf{peer 2 (start\_p2p.py)}
+%     sẽ \textbf{kết nối trực tiếp} với nhau qua TCP socket để gửi/nhận tin nhắn.
+%     Nội dung chat vì vậy không cần đi qua server trung tâm, giúp giảm tải băng thông và độ trễ.
+% \end{itemize}
+
+% Một peer trong hệ thống gồm hai tiến trình cục bộ:
+% \textbf{browser} (giao diện và gọi các chức năng điều phối trên server) và
+% \textbf{P2P client} (xử lý socket để nhắn tin).
+% Browser trao đổi với P2P client theo cơ chế nội bộ (ví dụ: gọi API nội bộ/localhost hoặc IPC) để yêu cầu gửi tin,
+% còn P2P client phụ trách thiết lập kết nối và nhận/gửi dữ liệu chat với peer còn lại.
+% Nhờ tách như vậy, server chỉ giữ vai trò \textbf{điều phối/kết nối ban đầu}, còn \textbf{luồng dữ liệu chat}
+% được truyền trực tiếp giữa các peer theo đúng sơ đồ.
+
+%==============================
+\section{Kiến trúc hệ thống}
+%==============================
+WeApRous là một ứng dụng mạng \textbf{hybrid} (chat tương tự Skype), kết hợp \textbf{client--server}
+và \textbf{peer-to-peer (P2P)}. Hệ thống hỗ trợ \textbf{quản lý channel} và \textbf{đồng bộ trạng thái}
+giữa các peer phân tán. Kiến trúc gồm hai phần đúng theo Hình~\ref{fig:arc_proxy} và Hình~\ref{fig:arc_p2p}:
+(i) \textbf{HTTP Server theo Reverse Proxy} cho web/điều phối và xác thực phiên; (ii) \textbf{Chat P2P có server điều phối}
+để thiết lập kết nối và duy trì thông tin channel/peer.
+
+%=====================================
+\subsection{HTTP Server -- Reverse Proxy \& Cookie Session}
+%=====================================
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{image/arc_proxy.png}
+    \caption{Kiến trúc HTTP Server với cơ chế xác thực cookie}
+    \label{fig:arc_proxy}
+\end{figure}
+
+Như Hình~\ref{fig:arc_proxy}, mọi request từ \textbf{peer (browser)} đi vào
+\textbf{server proxy (\texttt{start\_proxy.py})} và được \textbf{forward} đến một
+\textbf{server backend (\texttt{start\_app.py})} trong backend pool.
+
+\begin{itemize}
+    \item \textbf{Proxy} đóng vai trò \textbf{trung gian/entry point}, giúp quản lý traffic, tập trung định tuyến,
+    và hỗ trợ forwarding/load distribution khi có nhiều backend, từ đó tăng khả năng mở rộng và độ ổn định.
+
+    \item \textbf{Backend} là lớp xử lý nghiệp vụ: routing/API, phục vụ nội dung, và \textbf{xác thực \& quản lý phiên}
+    bằng \textbf{cookie session} (trả \texttt{Set-Cookie} khi đăng nhập và kiểm tra \texttt{Cookie} ở các request sau).
+    Ngoài ra, backend cung cấp thông tin peer và metadata phục vụ điều phối P2P (peer online, tạo/join channel, thành viên).
+\end{itemize}
+
+%==========================================
+\subsection{Chat P2P -- Server điều phối \& Peer truyền dữ liệu}
+%==========================================
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{image/arc_p2p.png}
+    \caption{Kiến trúc ứng dụng Chat P2P}
+    \label{fig:arc_p2p}
+\end{figure}
+
+Như Hình~\ref{fig:arc_p2p}, kiến trúc chat tách thành:
+\begin{itemize}
+    \item \textbf{Client--server:} peer dùng \textbf{browser} làm việc với \textbf{server}
+    (\texttt{start\_app.py}, \texttt{start\_proxy.py}) để đăng nhập/xác thực, đăng ký IP/port,
+    lấy danh sách peer online và \textbf{quản lý channel}. Server đóng vai trò \textbf{tracker/registry} để
+    hỗ trợ \textbf{đồng bộ trạng thái} (thành viên channel, trạng thái peer, thông tin kết nối).
+    \item \textbf{P2P:} mỗi máy chạy \textbf{P2P client} (\texttt{start\_p2p.py}),
+    sau đó các peer \textbf{kết nối trực tiếp} qua TCP socket để gửi/nhận tin nhắn, không chuyển tiếp nội dung chat qua server.
+\end{itemize}
+
+Mỗi peer gồm \textbf{browser} (UI/điều phối) và \textbf{P2P client} (socket dữ liệu), đảm bảo server tập trung vào
+quản lý/đồng bộ, còn dữ liệu chat truyền trực tiếp giữa các peer.
