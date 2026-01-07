@@ -1,0 +1,83 @@
+\section{Xác thực (Sanity Test) và Đánh giá Kết quả Thực tế (Hiệu năng)}
+
+Các file test và các chạy được lưu trong thư mục source, trong thư mục \texttt{test/}.
+
+\subsection{Xác thực và Kiểm tra Sanity}
+
+Hệ thống được kiểm tra toàn diện bằng bộ công cụ \texttt{WeApRous Testing Suite}. Chiến lược xác thực tập trung vào \textit{smoke testing} các thành phần cốt lõi trước khi tiến hành đo đạc hiệu năng.
+
+\begin{itemize}
+    \item \textbf{Trạng thái Sanity Test:} Hệ thống vượt qua \textbf{18/18} bài kiểm tra sanity, đạt \textbf{tỷ lệ thành công 100\%}.
+    \item \textbf{Phạm vi kiểm tra:} Bộ kiểm tra sanity (\texttt{test\_sanity.py}) xác thực các thành phần quan trọng sau:
+    \begin{itemize}
+        \item \textbf{Khởi tạo ứng dụng:} Xác nhận việc khởi tạo đúng lớp \texttt{WeApRous} và đăng ký routing.
+        \item \textbf{Giao thức HTTP:} Kiểm tra việc phân tích chính xác các yêu cầu GET/POST, tham số truy vấn và xử lý cookie.
+        \item \textbf{Kết nối Socket:} Đảm bảo socket có thể bind, listen và thiết lập kết nối client--server mà không phát sinh lỗi.
+        \item \textbf{Tính toàn vẹn tệp tin:} Xác nhận sự tồn tại của các thư mục (\texttt{daemon}, \texttt{www}, \texttt{static}) và các tệp cấu hình cần thiết.
+    \end{itemize}
+\end{itemize}
+
+% \paragraph{Độ bao phủ kiểm thử}
+Ngoài các bài kiểm tra sanity cơ bản, toàn bộ bộ regression test gồm \textbf{42 unit tests} trên 5 nhóm kiểm thử (Sanity, Integration, P2P, Proxy, Performance) đều đạt trạng thái \textbf{PASS}. Tổng thời gian thực thi xấp xỉ \textbf{14.50 giây}.
+
+\subsection{Đánh giá Kết quả Thực tế (Hiệu năng)}
+
+Hiệu năng hệ thống được đánh giá bằng bộ kiểm thử \texttt{performance\_evaluation.py}, tập trung vào thông lượng, độ trễ và khả năng xử lý đồng thời.
+
+\subsubsection{Hiệu năng Máy chủ HTTP}
+
+Máy chủ HTTP thể hiện thông lượng cao và độ trễ thấp, vượt ngưỡng mục tiêu cho mức hiệu năng \textit{Excellent} (>100 req/s).
+
+\begin{itemize}
+    \item \textbf{Thông lượng:} \textbf{283.79 requests/second}.
+    \item \textbf{Độ trễ:} Thời gian phản hồi trung bình \textbf{13.68 ms}, độ lệch chuẩn \textbf{5.88 ms}, cho thấy độ ổn định cao.
+    \item \textbf{Độ tin cậy:} Tỷ lệ thành công \textbf{100\%} trên 100 yêu cầu.
+\end{itemize}
+
+\subsubsection{Truyền thông P2P và Broadcast}
+
+Cơ chế giao tiếp ngang hàng được kiểm thử cho cả gửi trực tiếp và quảng bá.
+
+\begin{itemize}
+    \item \textbf{Gửi trực tiếp:} Đạt \textbf{75.6 req/s} với độ trễ trung bình \textbf{12.21 ms}, tương ứng mức hiệu năng \textit{Good} theo tiêu chuẩn hệ thống.
+    \item \textbf{Broadcast:} Đạt \textbf{68.27 req/s}. Độ trễ trung bình tăng lên \textbf{53.01 ms} do chi phí phân phối đa nút, phù hợp với đặc tính độ phức tạp $O(n)$.
+\end{itemize}
+
+\subsubsection{Proxy và Cân bằng tải}
+
+Thuật toán round-robin của proxy server được đánh giá về độ chính xác phân phối và chi phí xử lý.
+
+\begin{itemize}
+    \item \textbf{Phân phối tải:} Đạt tỷ lệ \textbf{50/50} giữa hai backend.
+    \item \textbf{Chất lượng cân bằng:} Độ lệch chuẩn \textbf{0.0}, cho thấy cân bằng tải hoàn hảo.
+    \item \textbf{Thông lượng:} Proxy duy trì \textbf{2,417.72 req/s}, chứng tỏ chi phí chuyển tiếp rất thấp.
+\end{itemize}
+
+\subsubsection{Khả năng xử lý đồng thời}
+
+Hệ thống được stress test với nhiều kết nối đồng thời nhằm đánh giá độ ổn định.
+
+\begin{itemize}
+    \item \textbf{Dung lượng:} Xử lý thành công \textbf{30/30} kết nối đồng thời tối đa.
+    \item \textbf{Tốc độ chấp nhận kết nối:} Khoảng \textbf{2,718 kết nối/giây}.
+\end{itemize}
+
+\subsection{Tổng hợp Kết quả so với Ngưỡng Đánh giá}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Chỉ số} & \textbf{Ngưỡng kỳ vọng} & \textbf{Kết quả thực tế} & \textbf{Đánh giá} \\
+\hline
+Sanity Check & 100\% Pass & 100\% (18/18) & PASS \\
+HTTP Throughput & > 100 req/s & 283.79 req/s & Excellent \\
+P2P Latency & < 20 ms & 12.21 ms & Healthy \\
+Load Balance StdDev & < 5.0 & 0.0 & Perfect \\
+Success Rate & > 95\% & 100\% & PASS \\
+\hline
+\end{tabular}
+\caption{So sánh kết quả thực nghiệm với ngưỡng hiệu năng}
+\end{table}
+
+Từ các kết quả trên, hệ thống được xác nhận là \textbf{đúng chức năng} và \textbf{đạt hiệu năng cao}, đáp ứng đầy đủ các tiêu chí trước khi triển khai.
